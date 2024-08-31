@@ -17,10 +17,10 @@ import java.util.Map;
 
 public class PredicateBuilder {
 
-    static java.util.function.Predicate<Object> nonNullOrNonEmpty = o ->{
-        if (o instanceof Integer && (Integer) o >0){
+    private static final java.util.function.Predicate<Object> nonNullOrNonEmptyNonZero = o ->{
+        if (o instanceof Integer && (Integer) o !=0){
             return true;
-        } else if (o instanceof Long && (Long) o >0) {
+        } else if (o instanceof Long && (Long) o !=0) {
             return true;
         } else if (o instanceof String && !((String) o).isEmpty()) {
             return true;
@@ -28,13 +28,16 @@ public class PredicateBuilder {
         return false;
     };
 
+    private static final java.util.function.Predicate<Field> isPrimitiveOrString = field -> field.getType().isPrimitive() ||
+            field.getType().getName().equals("java.lang.String");
+
     public static <T> Predicate build(T model) throws IllegalAccessException, IntrospectionException, InvocationTargetException {
         PathBuilder<T> entityPath = pathBuilder(model);
         BooleanBuilder booleanBuilder= new BooleanBuilder();
 
         getFieldValues(model,null).forEach((k,v) ->{
             System.out.println("eval key "+k+" value "+v);
-            if(nonNullOrNonEmpty.test(v)){
+            if(nonNullOrNonEmptyNonZero.test(v)){
                 System.out.println("Adding key "+k+" value "+v);
                 booleanBuilder.and(entityPath.get(k).eq(v));
             }
@@ -53,7 +56,7 @@ public class PredicateBuilder {
         for (Field field:allFields) {
 
             Object value = getValueFromGetter(field,model);
-            if(field.getType().isPrimitive() || field.getType().getName().equals("java.lang.String") ) {
+            if( isPrimitiveOrString.test(field) ) {
                 System.out.println("Field "+auxPrefix+field.getName()+" value "+value);
                 if (value!= null ) {
                     fieldValPair.put(auxPrefix+field.getName(), value);
@@ -70,7 +73,7 @@ public class PredicateBuilder {
         return fieldValPair;
     }
 
-    private static <T> Object getValueFromGetter(Field field,T model) throws IntrospectionException, InvocationTargetException, IllegalAccessException {
+    private static <T> Object getValueFromGetter(Field field,T model) throws InvocationTargetException, IllegalAccessException {
         try {
             PropertyDescriptor pd = new PropertyDescriptor(field.getName(), model.getClass());
             Method getter = pd.getReadMethod();
@@ -84,7 +87,7 @@ public class PredicateBuilder {
 
      public static <T> PathBuilder<T> pathBuilder(T model) {
 
-         Class<?> myEntity = null;
+         Class<?> myEntity;
             try {
                 myEntity = Class.forName(model.getClass().getName());
                 // check for @Entity Annotation
